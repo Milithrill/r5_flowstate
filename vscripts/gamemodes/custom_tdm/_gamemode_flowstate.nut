@@ -53,7 +53,6 @@ struct {
 	bool mapIndexChanged = true
 	array<entity> playerSpawnedProps
 	array<ItemFlavor> characters
-	float lastKillTimer
 	int SameKillerStoredKills=0
 	array<string> whitelistedWeapons
 	array<string> whitelistedAbilities
@@ -101,7 +100,7 @@ struct PlayerInfo
 
 void function _CustomTDM_Init()
 {
-	
+	RegisterSignal("NewKillOnPlayerStreak")
 	if(GetCurrentPlaylistVarBool("enable_global_chat", true))
 		SetConVarBool("sv_forceChatToTeamOnly", false) //thanks rexx
 	else	
@@ -464,40 +463,22 @@ void function __HighPingCheck(entity player)
 	}
 }
 
-
-void function doubletriplekillaudio(entity victim, entity attacker)
+void function DoubleAndTripleKillAudio(entity attacker)
 {
-	if (!IsValid(attacker))
+	if (!IsValid(attacker) || !attacker.p.isDownedEnemyRecently || attacker != GetKillLeader())
 		return
-
-    entity killeader = GetKillLeader()
-    float doubleKillTime = 5.0
-    float tripleKillTime = 8.0
-
-    bool ReqCheck = attacker == killeader
-    if (ReqCheck) {
-        if (!plsTripleAudio)
-            attacker.p.downedEnemyAtOneTime = 2
-        else if (plsTripleAudio)
-            attacker.p.downedEnemyAtOneTime = 3
-    }
-
-    if ((Time() - attacker.p.lastKillTimer) < doubleKillTime && ReqCheck && attacker.p.downedEnemyAtOneTime == 2) {
-        foreach(player in GetPlayerArray())
-        thread EmitSoundOnEntityOnlyToPlayer(player, player, "diag_ap_aiNotify_killLeaderDoubleKill")
-
-        if (FlowState_ChosenCharacter() == 8)
-            thread EmitSoundOnEntityOnlyToPlayer(attacker, attacker, "diag_mp_wraith_bc_iDownedMultiple_1p")
-        plsTripleAudio = true;
-    }
-
-    if ((Time() - attacker.p.lastKillTimer) < tripleKillTime && ReqCheck && attacker.p.downedEnemyAtOneTime == 3) {
-        attacker.p.downedEnemyAtOneTime = 0
-        wait 1
-        foreach(player in GetPlayerArray())
-        thread EmitSoundOnEntityOnlyToPlayer(player, player, "diag_ap_aiNotify_killLeaderTripleKill")
-        plsTripleAudio = false;
-    }
+	
+	if( attacker.p.downedEnemyAtOneTime == 2 )
+	{
+		foreach(player in GetPlayerArray())
+			thread EmitSoundOnEntityOnlyToPlayer(player, player, "diag_ap_aiNotify_killLeaderDoubleKill")
+	}
+	
+	if( attacker.p.downedEnemyAtOneTime == 3)
+	{
+		foreach(player in GetPlayerArray())
+			thread EmitSoundOnEntityOnlyToPlayer(player, player, "diag_ap_aiNotify_killLeaderTripleKill")
+	}
 }
 
 void function _OnPlayerDied(entity victim, entity attacker, var damageInfo)
@@ -510,19 +491,20 @@ void function _OnPlayerDied(entity victim, entity attacker, var damageInfo)
         case eGameState.Playing:
             // Víctim
             void functionref() victimHandleFunc = void function() : (victim, attacker, damageInfo) {
-
-				if ( IsValid(victim) && victim == GetKillLeader() )
+	    		wait 1
+	    		if(!IsValid(victim)) return
+				
+				if ( victim == GetKillLeader() )
 				{
-					victim.FreezeControlsOnServer()
-					AddSurvivalCommentaryEvent( eSurvivalEventType.KILL_LEADER_ELIMINATED, attacker )
+					thread AddSurvivalCommentaryEvent( eSurvivalEventType.KILL_LEADER_ELIMINATED, attacker )
 
 					foreach ( player in GetPlayerArray() )
 						Remote_CallFunction_NonReplay( player, "ServerCallback_Survival_HighlightedPlayerKilled", victim, attacker, eSurvivalCommentaryPlayerType.KILLLEADER )
 				}
-	    		wait 1
-	    		if(!IsValid(victim)) return
 				
-	    		if(file.tdmState != eTDMState.NEXT_ROUND_NOW && IsValid(victim) && IsValid(attacker) && Spectator_GetReplayIsEnabled() && ShouldSetObserverTarget( attacker )){
+	    		if(file.tdmState != eTDMState.NEXT_ROUND_NOW && IsValid(victim) && IsValid(attacker) && Spectator_GetReplayIsEnabled() && ShouldSetObserverTarget( attacker ))
+				{
+					victim.FreezeControlsOnServer()	
 	    			victim.SetObserverTarget( attacker )
 	    			victim.SetSpecReplayDelay( 4 )
 	    			victim.StartObserverMode( OBS_MODE_IN_EYE )
@@ -579,17 +561,26 @@ void function _OnPlayerDied(entity victim, entity attacker, var damageInfo)
 
 	    			WpnAutoReloadOnKill(attacker)
 	    			GameRules_SetTeamScore(attacker.GetTeam(), GameRules_GetTeamScore(attacker.GetTeam()) + 1)
-	    			attacker.p.lastKillTimer = Time()
-					
+
 					int attackerKills = attacker.GetPlayerNetInt( "kills" )
-					if(	!IsValid(GetKillLeader()) && attackerKills == 2)
+				
+					if(	!IsValid( GetKillLeader() ) && attackerKills == 2)
 					{
-						thread SetKillLeader( attacker, attackerKills )
+						thread SetKillLeader( attacker, attackerKills, true )
 						return
 					}
 					
-					if ( IsValid(GetKillLeader()) && attackerKills > GetKillLeader().GetPlayerNetInt( "kills" ) && attacker != GetKillLeader())
-						thread SetKillLeader( attacker, attackerKills )
+					if ( IsValid( GetKillLeader() ) && attackerKills > GetKillLeader().GetPlayerNetInt( "kills" ) && attacker != GetKillLeader())
+					{				
+						thread SetKillLeader( attacker, attackerKills, true)
+					}
+					
+					if ( IsValid( GetKillLeader() ) && attacker == GetKillLeader() && attacker.p.downedEnemyAtOneTime < 3)
+					{
+						attacker.p.downedEnemyAtOneTime += 1						
+						Signal(attacker, "NewKillOnPlayerStreak")
+						thread RecentlyDownedEnemy(attacker, 5)
+					}
 	    		}
             }
 	    	thread victimHandleFunc()
@@ -602,11 +593,23 @@ void function _OnPlayerDied(entity victim, entity attacker, var damageInfo)
 
 	file.deathPlayersCounter++
 	if(file.deathPlayersCounter == 1 )
-		AddSurvivalCommentaryEvent( eSurvivalEventType.FIRST_BLOOD, attacker )
+		thread AddSurvivalCommentaryEvent( eSurvivalEventType.FIRST_BLOOD, attacker )
 
 	UpdatePlayerCounts()
 }
 
+void function RecentlyDownedEnemy( entity attacker, float time )
+{
+	EndSignal(attacker, "NewKillOnPlayerStreak")
+	attacker.p.isDownedEnemyRecently = true
+	DoubleAndTripleKillAudio(attacker)
+	
+	wait time
+	
+	if(!IsValid(attacker)) return 
+	attacker.p.isDownedEnemyRecently = false
+	attacker.p.downedEnemyAtOneTime = 0
+}
 
 void function _HandleRespawn(entity player, bool isDroppodSpawn = false)
 {
@@ -679,11 +682,13 @@ void function _HandleRespawn(entity player, bool isDroppodSpawn = false)
 		player.GiveWeapon( "mp_weapon_bolo_sword_primary", WEAPON_INVENTORY_SLOT_PRIMARY_2, [] )
 		player.GiveOffhandWeapon( "melee_bolo_sword", OFFHAND_MELEE, [] )
 		
-		SetPlayerInventory( player, [] )
-		Inventory_SetPlayerEquipment(player, "backpack_pickup_lv3", "backpack")
-		array<string> optics = ["optic_cq_hcog_classic", "optic_cq_hcog_bruiser", "optic_cq_holosight", "optic_cq_threat", "optic_cq_holosight_variable", "optic_ranged_hcog", "optic_ranged_aog_variable", "optic_sniper_variable", "optic_sniper_threat"]
-		foreach(optic in optics)
-			SURVIVAL_AddToPlayerInventory(player, optic)
+		if(GetCurrentPlaylistVarBool("flowstateGiveAllOpticsToPlayer", false )){
+			SetPlayerInventory( player, [] )
+			Inventory_SetPlayerEquipment(player, "backpack_pickup_lv3", "backpack")
+			array<string> optics = ["optic_cq_hcog_classic", "optic_cq_hcog_bruiser", "optic_cq_holosight", "optic_cq_threat", "optic_cq_holosight_variable", "optic_ranged_hcog", "optic_ranged_aog_variable", "optic_sniper_variable", "optic_sniper_threat"]
+			foreach(optic in optics)
+				SURVIVAL_AddToPlayerInventory(player, optic)
+		}
 	}
 
 	if (FlowState_RandomGuns() && !FlowState_Gungame() && IsValid( player ))
@@ -936,19 +941,16 @@ void function GiveRandomPrimaryWeapon(entity player)
 	int slot = WEAPON_INVENTORY_SLOT_PRIMARY_0
 
     array<string> Weapons = [
-		"mp_weapon_r97 optic_cq_hcog_classic barrel_stabilizer_l4_flash_hider stock_tactical_l3 bullets_mag_l2",
-		"mp_weapon_rspn101 optic_cq_hcog_bruiser barrel_stabilizer_l4_flash_hider stock_tactical_l3 bullets_mag_l2",
-		"mp_weapon_vinson optic_cq_hcog_bruiser stock_tactical_l3 highcal_mag_l3",
-		"mp_weapon_hemlok optic_cq_hcog_bruiser stock_tactical_l3 highcal_mag_l3 barrel_stabilizer_l4_flash_hider",
-		"mp_weapon_pdw optic_cq_hcog_classic stock_tactical_l3 highcal_mag_l3",
-		"mp_weapon_lmg optic_cq_hcog_bruiser highcal_mag_l3 barrel_stabilizer_l3 stock_tactical_l3",
-        "mp_weapon_energy_ar optic_cq_hcog_bruiser energy_mag_l3 stock_tactical_l3 hopup_turbocharger",
-        "mp_weapon_alternator_smg optic_cq_hcog_classic bullets_mag_l3 stock_tactical_l3",
-        "mp_weapon_lstar",
-        "mp_weapon_wingman highcal_mag_l1",
-        "mp_weapon_dmr optic_cq_hcog_bruiser highcal_mag_l2 barrel_stabilizer_l2 stock_sniper_l3",
-        "mp_weapon_esaw optic_cq_hcog_classic energy_mag_l1 barrel_stabilizer_l4_flash_hider",
-        "mp_weapon_sniper",
+		"mp_weapon_wingman optic_cq_hcog_classic highcal_mag_l2",
+		"mp_weapon_r97 optic_cq_threat bullets_mag_l2 stock_tactical_l2 barrel_stabilizer_l1",
+		"mp_weapon_pdw optic_cq_threat highcal_mag_l3 stock_tactical_l3",
+		"mp_weapon_wingman optic_cq_hcog_classic highcal_mag_l3",
+		"mp_weapon_vinson stock_tactical_l2 highcal_mag_l3",
+		"mp_weapon_hemlok optic_cq_hcog_classic stock_tactical_l2 highcal_mag_l2 barrel_stabilizer_l2",
+		"mp_weapon_lmg barrel_stabilizer_l1 stock_tactical_l3",
+        "mp_weapon_energy_ar energy_mag_l2 stock_tactical_l3",
+        "mp_weapon_alternator_smg bullets_mag_l3 stock_tactical_l3 barrel_stabilizer_l3",
+        "mp_weapon_rspn101 stock_tactical_l2 bullets_mag_l2 barrel_stabilizer_l1"
 	]
 	
 	foreach(weapon in Weapons)
@@ -967,16 +969,18 @@ void function GiveRandomSecondaryWeapon( entity player)
 	int slot = WEAPON_INVENTORY_SLOT_PRIMARY_1
 
     array<string> Weapons = [
-		"mp_weapon_wingman optic_cq_hcog_classic highcal_mag_l1",
-		"mp_weapon_energy_shotgun shotgun_bolt_l1",
-		"mp_weapon_shotgun shotgun_bolt_l1 ",
-		"mp_weapon_mastiff",
-		"mp_weapon_autopistol optic_cq_hcog_classic bullets_mag_l1",
-		"mp_weapon_shotgun_pistol shotgun_bolt_l3",
-		"mp_weapon_defender optic_sniper stock_sniper_l2",
-		"mp_weapon_doubletake energy_mag_l3",
-		"mp_weapon_g2 bullets_mag_l3 barrel_stabilizer_l4_flash_hider stock_sniper_l3 hopup_double_tap",
-		"mp_weapon_semipistol bullets_mag_l2",
+		"mp_weapon_r97 optic_cq_holosight bullets_mag_l2 stock_tactical_l3 barrel_stabilizer_l4_flash_hider",
+		"mp_weapon_energy_shotgun shotgun_bolt_l2",
+		"mp_weapon_pdw highcal_mag_l3 stock_tactical_l2",
+		"mp_weapon_mastiff shotgun_bolt_l3",
+		"mp_weapon_autopistol bullets_mag_l2",
+		"mp_weapon_alternator_smg optic_cq_holosight bullets_mag_l3 stock_tactical_l3 barrel_stabilizer_l3",
+		"mp_weapon_energy_ar energy_mag_l1 stock_tactical_l3 hopup_turbocharger",
+		"mp_weapon_doubletake optic_ranged_hcog energy_mag_l3 stock_sniper_l3",
+		"mp_weapon_vinson stock_tactical_l3 highcal_mag_l3",
+		"mp_weapon_rspn101 stock_tactical_l1 bullets_mag_l3 barrel_stabilizer_l2"
+		"mp_weapon_car optic_cq_holosight stock_tactical_l1 bullets_mag_l3"
+		"mp_weapon_volt_smg energy_mag_l2 stock_tactical_l3"
 	]
 	
 	foreach(weapon in Weapons)
@@ -1060,7 +1064,8 @@ void function GiveRandomTac(entity player)
 		"mp_weapon_grenade_bangalore",
 		"mp_ability_area_sonar_scan",
 		"mp_weapon_grenade_sonar",
-		"mp_weapon_deployable_cover"
+		"mp_weapon_deployable_cover",
+		"mp_ability_holopilot"
 	]
 
 	foreach(ability in file.whitelistedAbilities)
@@ -1078,7 +1083,8 @@ void function GiveRandomUlt(entity player )
 		"mp_weapon_phase_tunnel",
 		"mp_ability_3dash",
 		"mp_ability_hunt_mode",
-		"mp_weapon_grenade_defensive_bombardment",
+		"mp_weapon_grenade_creeping_bombardment",
+		"mp_weapon_grenade_defensive_bombardment"
 	]
 	
 	foreach(ability in file.whitelistedAbilities)
@@ -2552,8 +2558,9 @@ bool function ClientCommand_SpectateEnemies(entity player, array<string> args)
             return false
         }
 
-        if( IsValid(player) && player.GetPlayerNetInt( "spectatorTargetCount" ) > 0 )
+        if( IsValid(player) && player.GetPlayerNetInt( "spectatorTargetCount" ) > 0 && player.IsObserver())
         {
+			player.MakeVisible()
             player.SetPlayerNetInt( "spectatorTargetCount", 0 )
 	        player.SetSpecReplayDelay( 0 )
             player.StopObserverMode()
@@ -2562,12 +2569,14 @@ bool function ClientCommand_SpectateEnemies(entity player, array<string> args)
         }
         else if( IsValid(player) && player.GetPlayerNetInt( "spectatorTargetCount" ) == 0 && IsValid(specTarget))
         {
-			player.MakeInvisible()
-            player.SetPlayerNetInt( "spectatorTargetCount", enemiesArray.len() )
-	        player.SetSpecReplayDelay( Spectator_GetReplayDelay() )
-	        player.StartObserverMode( OBS_MODE_IN_EYE )
-	        player.SetObserverTarget( specTarget )
-            printf("Spectating!")
+			try{
+				player.MakeInvisible()
+				player.SetPlayerNetInt( "spectatorTargetCount", enemiesArray.len() )
+				player.SetSpecReplayDelay( 2 )
+				player.StartObserverMode( OBS_MODE_IN_EYE )
+				player.SetObserverTarget( specTarget )
+				printf("Spectating!")
+			} catch(e420){}
         }
     }
     else
