@@ -514,7 +514,7 @@ void function PilotBlood_Passive( entity player, int passive, bool didHave, bool
 
 void function PilotBlood_Passive_Body(entity player, int passive, bool didHave, bool nowHas)
 {
-	float healthRegenStartDelay = 5.0
+	float healthRegenStartDelay = 2.0
 
 	while ( IsValid( player ) )
 	{
