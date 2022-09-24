@@ -87,8 +87,10 @@ void function SV_CL_Init()
 	ClientSidePickups_Init()
 	GrappleWeaponInit()
 	ShInfoCords_Init()
+	if(GameRules_GetGameMode() == "map_editor")
+		ShAssets_Init()
 
-	#if R5DEV
+	#if DEVELOPER
 		ShDevUtility_Init()
 		CaptureMode_Shared_Init()
 	#endif
@@ -313,9 +315,9 @@ void function Server_Init()
 	PilotsPassage_Init()
 	SneakPeek_Init()
 	JumpPad_Init()
-	#if R5DEV
+	#if DEVELOPER
 		SmokeTest_Init()
-	#endif // DEV
+	#endif // DEVELOPER
 }
 #endif // SERVER
 

@@ -1,7 +1,7 @@
 untyped
 
 global function InitDevMenu
-#if R5DEV
+#if DEVELOPER
 global function DEV_InitLoadoutDevSubMenu
 global function SetupDevCommand // for dev
 global function SetupDevFunc // for dev
@@ -72,7 +72,7 @@ function Dummy_Untyped( param )
 
 void function InitDevMenu( var newMenuArg )
 {
-	#if R5DEV
+	#if DEVELOPER
 		var menu = GetMenu( "DevMenu" )
 
 		AddMenuEventHandler( menu, eUIEvent.MENU_OPEN, OnOpenDevMenu )
@@ -105,7 +105,7 @@ void function InitDevMenu( var newMenuArg )
 
 void function AddLevelDevCommand( string label, string command )
 {
-	#if R5DEV
+	#if DEVELOPER
 		string codeDevMenuAlias = DEV_MENU_NAME + "/" + label
 		DevMenu_Alias_DEV( codeDevMenuAlias, command )
 
@@ -116,7 +116,7 @@ void function AddLevelDevCommand( string label, string command )
 	#endif
 }
 
-#if R5DEV
+#if DEVELOPER
 void function OnOpenDevMenu()
 {
 	file.pageHistory.clear()
@@ -268,6 +268,8 @@ void function ChangeToThisMenu_WithOpParm( void functionref( var ) menuFuncWithO
 
 void function SetupDefaultDevCommandsMP()
 {
+	if(IsConnected() && GetCurrentPlaylistName() == "map_editor")
+		SetupDevMenu( "Editor", SetDevMenu_Editor )
 	SetupDevMenu( "Abilities", SetDevMenu_Abilities )
 	SetupDevMenu( "Equip Weapon", SetDevMenu_Weapons )
 	SetupDevMenu( "TDM Weapon", SetDevMenu_TDMWeapons )
@@ -352,6 +354,9 @@ void function SetupDefaultDevCommandsMP()
 
 	SetupDevCommand( "Equip Custom Heirloom", "script thread SetupHeirloom()" )
 	SetupDevCommand( "Equip Custom Heirloom (All Players)", "script thread SetupHeirloom( true )" )
+	SetupDevCommand( "Unequip Custom Heirloom", "script thread UnEquipHeirloom()" )
+	SetupDevCommand( "Unequip Custom Heirloom (All Players)", "script thread UnEquipHeirloom( true )" )
+	
 	//SetupDevCommand( "Toggle Offhand Low Recharge", "ToggleOffhandLowRecharge" )
 	//SetupDevCommand( "Map Metrics Toggle", "script_client GetLocalClientPlayer().ClientCommand( \"toggle map_metrics 0 1 2 3\" )" )
 	//SetupDevCommand( "Toggle Pain Death sound debug", "script TogglePainDeathDebug()" )
@@ -417,6 +422,10 @@ void function SetDevMenu_SurvivalCharacter( var _ )
 	thread ChangeToThisMenu( SetupChangeSurvivalCharacterClass )
 }
 
+void function SetDevMenu_Editor( var _ ) 
+{
+	thread ChangeToThisMenu( SetupEditor ) 
+}
 
 void function DEV_InitLoadoutDevSubMenu()
 {

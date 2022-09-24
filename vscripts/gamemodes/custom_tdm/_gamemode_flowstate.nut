@@ -47,7 +47,7 @@ enum eTDMState
 }
 
 struct {
-	string scriptversion = "v3.2"
+	string scriptversion = "v3.35"
     int tdmState = eTDMState.IN_PROGRESS
     int nextMapIndex = 0
 	bool mapIndexChanged = true
@@ -103,9 +103,9 @@ void function _CustomTDM_Init()
 	RegisterSignal("NewKillOnPlayerStreak")
 	if(GetCurrentPlaylistVarBool("enable_global_chat", true))
 		SetConVarBool("sv_forceChatToTeamOnly", false) //thanks rexx
-	else	
+	else
 		SetConVarBool("sv_forceChatToTeamOnly", true)
-		
+
 	printt("[Flowstate] -> _CustomTDM_Init")
 	SurvivalFreefall_Init() //Enables freefall/skydive
 	PrecacheCustomMapsProps()
@@ -119,7 +119,7 @@ void function _CustomTDM_Init()
             _OnPlayerConnectedPROPHUNT(player)
         else if (FlowState_SURF())
             _OnPlayerConnectedSURF(player)
-        else 
+        else
 			thread _OnPlayerConnected(player)
 
         UpdatePlayerCounts()
@@ -151,11 +151,11 @@ void function _CustomTDM_Init()
 		AddClientCommandCallback("next_round", ClientCommand_NextRound)
 		AddClientCommandCallback("tgive", ClientCommand_GiveWeapon)
 	}
-	
+
 	AddClientCommandCallback("latency", ClientCommand_ShowLatency)
 	AddClientCommandCallback("flowstatekick", ClientCommand_FlowstateKick)
 	AddClientCommandCallback("commands", ClientCommand_Help)
-	
+
 	for(int i = 0; GetCurrentPlaylistVarString("whitelisted_weapon_" + i.tostring(), "~~none~~") != "~~none~~"; i++)
 	{
 		file.whitelistedWeapons.append(GetCurrentPlaylistVarString("whitelisted_weapon_" + i.tostring(), "~~none~~"))
@@ -215,9 +215,9 @@ LocPair function _GetVotingLocation()
         case "mp_rr_desertlands_64k_x_64k_nx":
 			return NewLocPair(<-19459, 2127, 6404>, <0, 180, 0>)
         case "mp_rr_arena_composite":
-                return NewLocPair(<0, 4780, 220>, <0, -90, 0>)
+            return NewLocPair(<0, 4780, 220>, <0, -90, 0>)
         default:
-            Assert(false, "No voting location for the map!")
+			Assert(false, "No voting location for the map!")
     }
     unreachable
 }
@@ -251,11 +251,11 @@ LocPair function _GetAppropriateSpawnLocation(entity player)
 {
 	switch(GetGameState())
     {
-        case eGameState.MapVoting: 
+        case eGameState.MapVoting:
 			return _GetVotingLocation()
         case eGameState.Playing:
-		
-			if(IsFFAGame()) 
+
+			if(IsFFAGame())
 				return Flowstate_GetBestSpawnPointFFA()
 			else
 				return Flowstate_GetBestSpawnPointFFA() // !FIXME
@@ -267,7 +267,7 @@ LocPair function Flowstate_GetBestSpawnPointFFA()
 {
 	if(file.selectedLocation.spawns.len() == 0) return _GetVotingLocation()
 	table<LocPair, float> SpawnsAndNearestEnemy = {}
-	
+
 	foreach(spawn in file.selectedLocation.spawns)
     {
 		array<float> AllPlayersDistancesForThisSpawnPoint
@@ -334,7 +334,7 @@ void function DissolveItem(entity prop)
 void function _OnPlayerConnected(entity player)
 {
 	while(IsDisconnected( player )) WaitFrame()
-	
+
     if(!IsValid(player)) return
 
 	if(FlowState_ForceCharacter()){
@@ -452,7 +452,7 @@ void function __HighPingCheck(entity player)
 		Message(player, "FLOWSTATE KICK", "Admin has enabled a ping limit: " + FlowState_MaxPingAllowed() + " ms. \n Your ping is too high: " + (int(player.GetLatency()* 1000) - 40) + " ms.", 3)
 
 		wait 3
-		
+
 		if(!IsValid(player)) return
 		printl("[Flowstate] -> Kicking " + player.GetPlayerName() + " -> [High Ping]")
 		ClientCommand( player, "disconnect" )
@@ -467,13 +467,13 @@ void function DoubleAndTripleKillAudio(entity attacker)
 {
 	if (!IsValid(attacker) || !attacker.p.isDownedEnemyRecently || attacker != GetKillLeader())
 		return
-	
+
 	if( attacker.p.downedEnemyAtOneTime == 2 )
 	{
 		foreach(player in GetPlayerArray())
 			thread EmitSoundOnEntityOnlyToPlayer(player, player, "diag_ap_aiNotify_killLeaderDoubleKill")
 	}
-	
+
 	if( attacker.p.downedEnemyAtOneTime == 3)
 	{
 		foreach(player in GetPlayerArray())
@@ -493,7 +493,7 @@ void function _OnPlayerDied(entity victim, entity attacker, var damageInfo)
             void functionref() victimHandleFunc = void function() : (victim, attacker, damageInfo) {
 	    		wait 1
 	    		if(!IsValid(victim)) return
-				
+
 				if ( victim == GetKillLeader() )
 				{
 					thread AddSurvivalCommentaryEvent( eSurvivalEventType.KILL_LEADER_ELIMINATED, attacker )
@@ -501,10 +501,10 @@ void function _OnPlayerDied(entity victim, entity attacker, var damageInfo)
 					foreach ( player in GetPlayerArray() )
 						Remote_CallFunction_NonReplay( player, "ServerCallback_Survival_HighlightedPlayerKilled", victim, attacker, eSurvivalCommentaryPlayerType.KILLLEADER )
 				}
-				
+
 	    		if(file.tdmState != eTDMState.NEXT_ROUND_NOW && IsValid(victim) && IsValid(attacker) && Spectator_GetReplayIsEnabled() && ShouldSetObserverTarget( attacker ))
 				{
-					victim.FreezeControlsOnServer()	
+					victim.FreezeControlsOnServer()
 	    			victim.SetObserverTarget( attacker )
 	    			victim.SetSpecReplayDelay( 4 )
 	    			victim.StartObserverMode( OBS_MODE_IN_EYE )
@@ -528,7 +528,7 @@ void function _OnPlayerDied(entity victim, entity attacker, var damageInfo)
 
 	    		if(file.tdmState != eTDMState.NEXT_ROUND_NOW)
 	    		    wait Deathmatch_GetRespawnDelay()
-				
+
 				if(IsValid(victim)) {
 					_HandleRespawn( victim )
 					ClearInvincible(victim)
@@ -563,21 +563,21 @@ void function _OnPlayerDied(entity victim, entity attacker, var damageInfo)
 	    			GameRules_SetTeamScore(attacker.GetTeam(), GameRules_GetTeamScore(attacker.GetTeam()) + 1)
 
 					int attackerKills = attacker.GetPlayerNetInt( "kills" )
-				
+
 					if(	!IsValid( GetKillLeader() ) && attackerKills == 2)
 					{
 						thread SetKillLeader( attacker, attackerKills, true )
 						return
 					}
-					
+
 					if ( IsValid( GetKillLeader() ) && attackerKills > GetKillLeader().GetPlayerNetInt( "kills" ) && attacker != GetKillLeader())
-					{				
+					{
 						thread SetKillLeader( attacker, attackerKills, true)
 					}
-					
+
 					if ( IsValid( GetKillLeader() ) && attacker == GetKillLeader() && attacker.p.downedEnemyAtOneTime < 3)
 					{
-						attacker.p.downedEnemyAtOneTime += 1						
+						attacker.p.downedEnemyAtOneTime += 1
 						Signal(attacker, "NewKillOnPlayerStreak")
 						thread RecentlyDownedEnemy(attacker, 5)
 					}
@@ -603,10 +603,10 @@ void function RecentlyDownedEnemy( entity attacker, float time )
 	EndSignal(attacker, "NewKillOnPlayerStreak")
 	attacker.p.isDownedEnemyRecently = true
 	DoubleAndTripleKillAudio(attacker)
-	
+
 	wait time
-	
-	if(!IsValid(attacker)) return 
+
+	if(!IsValid(attacker)) return
 	attacker.p.isDownedEnemyRecently = false
 	attacker.p.downedEnemyAtOneTime = 0
 }
@@ -668,12 +668,12 @@ void function _HandleRespawn(entity player, bool isDroppodSpawn = false)
 		    TpPlayerToSpawnPoint(player)
 
 		player.UnfreezeControlsOnServer()
-		
+
 		if(FlowState_RandomGunsEverydie() && FlowState_FIESTAShieldsStreak())
 		{
 			PlayerRestoreShieldsFIESTA(player, player.GetShieldHealthMax())
 			PlayerRestoreHPFIESTA(player, 100)
-		} else 
+		} else
 			PlayerRestoreHP(player, 100, Equipment_GetDefaultShieldHP())
 
 		player.TakeNormalWeaponByIndexNow( WEAPON_INVENTORY_SLOT_PRIMARY_2 )
@@ -681,7 +681,7 @@ void function _HandleRespawn(entity player, bool isDroppodSpawn = false)
 		player.TakeOffhandWeapon( WEAPON_INVENTORY_SLOT_PRIMARY_2 )
 		player.GiveWeapon( "mp_weapon_bolo_sword_primary", WEAPON_INVENTORY_SLOT_PRIMARY_2, [] )
 		player.GiveOffhandWeapon( "melee_bolo_sword", OFFHAND_MELEE, [] )
-		
+
 		if(GetCurrentPlaylistVarBool("flowstateGiveAllOpticsToPlayer", false )){
 			SetPlayerInventory( player, [] )
 			Inventory_SetPlayerEquipment(player, "backpack_pickup_lv3", "backpack")
@@ -767,7 +767,7 @@ void function Flowstate_GrantSpawnImmunity(entity player, float duration)
 	function() : ( player )
 		{
 			if(!IsValid(player)) return
-			
+
 			player.MakeVisible()
 			player.ClearInvulnerable()
 			player.SetTakeDamageType( DAMAGE_YES )
@@ -775,19 +775,19 @@ void function Flowstate_GrantSpawnImmunity(entity player, float duration)
 		}
 	)
 	thread WpnPulloutOnRespawn(player, duration)
-	
+
 	EmitSoundOnEntityOnlyToPlayer( player, player, "PhaseGate_Enter_1p" )
 	EmitSoundOnEntityExceptToPlayer( player, player, "PhaseGate_Enter_3p" )
-	
+
 	StatusEffect_AddTimed( player, eStatusEffect.adrenaline_visuals, 1.0, duration, duration )
 	StatusEffect_AddTimed( player, eStatusEffect.speed_boost, 0.3, duration, duration )
 	StatusEffect_AddTimed( player, eStatusEffect.drone_healing, 1.0, duration, duration )
 	StatusEffect_AddTimed( player, eStatusEffect.stim_visual_effect, 1.0, duration, duration )
-	
+
 	player.SetTakeDamageType( DAMAGE_NO )
 	Highlight_SetEnemyHighlight( player, "survival_enemy_skydiving" )
 	player.SetInvulnerable()
-	
+
 	float endTime = Time() + duration
 	while(Time() <= endTime && IsValid(player)){
 		player.MakeInvisible()
@@ -801,6 +801,18 @@ void function Flowstate_GrantSpawnImmunity(entity player, float duration)
 void function WpnPulloutOnRespawn(entity player, float duration)
 {
 	if(!IsValid( player ) || !IsAlive(player) ) return
+
+	
+	if(GetCurrentPlaylistVarBool("flowstateReloadUltimateOnRespawn", false ))
+	{
+		entity tactical = player.GetOffhandWeapon( OFFHAND_TACTICAL )
+		tactical.SetWeaponPrimaryClipCount( tactical.GetWeaponPrimaryClipCountMax() )
+	}
+	if(GetCurrentPlaylistVarBool("flowstateReloadTacticalOnRespawn", false ))
+	{	
+		entity ultimate = player.GetOffhandWeapon( OFFHAND_ULTIMATE )
+		ultimate.SetWeaponPrimaryClipCount( ultimate.GetWeaponPrimaryClipCountMax() )
+	}
 	
 	if(IsValid( player.GetNormalWeapon( WEAPON_INVENTORY_SLOT_PRIMARY_1 )))
 	{
@@ -908,7 +920,7 @@ void function GiveRandomPrimaryWeaponMetagame(entity player)
 		string weaponName = weaponfullstring[0]
 		if(file.whitelistedWeapons.find(weaponName) != -1)
 				Weapons.removebyvalue(weapon)
-	}	
+	}
 
 	__GiveWeapon( player, Weapons, slot, RandomIntRange( 0, Weapons.len() ) )
 }
@@ -924,7 +936,7 @@ void function GiveRandomSecondaryWeaponMetagame(entity player)
 		"mp_weapon_mastiff",
 		"mp_weapon_wingman optic_cq_hcog_classic highcal_mag_l1",
 	]
-	
+
 	foreach(weapon in Weapons)
 	{
 		array<string> weaponfullstring = split( weapon , " ")
@@ -932,7 +944,7 @@ void function GiveRandomSecondaryWeaponMetagame(entity player)
 		if(file.whitelistedWeapons.find(weaponName) != -1)
 				Weapons.removebyvalue(weapon)
 	}
-	
+
 	__GiveWeapon( player, Weapons, slot, RandomIntRange( 0, Weapons.len() ) )
 }
 
@@ -952,7 +964,7 @@ void function GiveRandomPrimaryWeapon(entity player)
         "mp_weapon_alternator_smg bullets_mag_l3 stock_tactical_l3 barrel_stabilizer_l3",
         "mp_weapon_rspn101 stock_tactical_l2 bullets_mag_l2 barrel_stabilizer_l1"
 	]
-	
+
 	foreach(weapon in Weapons)
 	{
 		array<string> weaponfullstring = split( weapon , " ")
@@ -960,7 +972,7 @@ void function GiveRandomPrimaryWeapon(entity player)
 		if(file.whitelistedWeapons.find(weaponName) != -1)
 				Weapons.removebyvalue(weapon)
 	}
-	
+
 	__GiveWeapon( player, Weapons, slot, RandomIntRange( 0, Weapons.len() ) )
 }
 
@@ -982,7 +994,7 @@ void function GiveRandomSecondaryWeapon( entity player)
 		"mp_weapon_car optic_cq_holosight stock_tactical_l1 bullets_mag_l3"
 		"mp_weapon_volt_smg energy_mag_l2 stock_tactical_l3"
 	]
-	
+
 	foreach(weapon in Weapons)
 	{
 		array<string> weaponfullstring = split( weapon , " ")
@@ -990,7 +1002,7 @@ void function GiveRandomSecondaryWeapon( entity player)
 		if(file.whitelistedWeapons.find(weaponName) != -1)
 				Weapons.removebyvalue(weapon)
 	}
-	
+
 	__GiveWeapon( player, Weapons, slot, RandomIntRange( 0, Weapons.len() ) )
 }
 
@@ -1042,7 +1054,7 @@ void function GiveActualGungameWeapon(int index, entity player)
 		"mp_weapon_g2 bullets_mag_l3 barrel_stabilizer_l4_flash_hider stock_sniper_l3 hopup_double_tap",
 		"mp_weapon_semipistol bullets_mag_l2",
 	]
-	
+
 	foreach(weapon in Weapons)
 	{
 		array<string> weaponfullstring = split( weapon , " ")
@@ -1065,7 +1077,10 @@ void function GiveRandomTac(entity player)
 		"mp_ability_area_sonar_scan",
 		"mp_weapon_grenade_sonar",
 		"mp_weapon_deployable_cover",
-		"mp_ability_holopilot"
+		"mp_ability_holopilot",
+		"mp_ability_cloak",
+		//"mp_ability_space_elevator_tac",
+		"mp_ability_phase_rewind"
 	]
 
 	foreach(ability in file.whitelistedAbilities)
@@ -1083,10 +1098,10 @@ void function GiveRandomUlt(entity player )
 		"mp_ability_hunt_mode",
 		"mp_weapon_grenade_creeping_bombardment",
 	]
-	
+
 	foreach(ability in file.whitelistedAbilities)
 		Weapons.removebyvalue(ability)
-		
+
 	if(IsValid(player))
 	    player.GiveOffhandWeapon(Weapons[ RandomIntRange( 0, Weapons.len()) ],  OFFHAND_ULTIMATE)
 }
@@ -1641,10 +1656,10 @@ void function SimpleChampionUI(){
 
 	if(file.selectedLocation.name == "TTV Building" && FlowState_ExtrashieldsEnabled()){
 		DestroyPlayerProps()
-		CreateGroundMedKit(<10725, 5913,-4225>)
+		CreateFlowStateGroundMedKit( <10725, 5913,-4225>, ZERO_VECTOR , 3 , FlowState_ExtrashieldsSpawntime() )
 	} else if(file.selectedLocation.name == "Skill trainer By Colombia" && FlowState_ExtrashieldsEnabled()){
 		DestroyPlayerProps()
-		CreateGroundMedKit(<17247,31823,-310>)
+		CreateFlowStateGroundMedKit( <17247,31823,-310>, ZERO_VECTOR , 3 , FlowState_ExtrashieldsSpawntime())
 		thread SkillTrainerLoad()
 	} else if(file.selectedLocation.name == "Skill trainer By Colombia" )
 	{
@@ -1670,7 +1685,7 @@ void function SimpleChampionUI(){
 	} else if(file.selectedLocation.name == "Gaunlet" && FlowState_ExtrashieldsEnabled()){
 		DestroyPlayerProps()
 		printt("Flowstate DEBUG - creating Gaunlet Extrashield.")
-		CreateGroundMedKit(<-21289, -12030, 3060>)
+		CreateFlowStateGroundMedKit( <-21289, -12030, 3060>, ZERO_VECTOR, 3 , FlowState_ExtrashieldsSpawntime() )
 	} else if (file.selectedLocation.name == "White Forest By Zer0Bytes"){
 		DestroyPlayerProps()
 		printt("Flowstate DEBUG - creating props for White Forest.")
@@ -1722,7 +1737,8 @@ if(GetBestPlayer()==PlayerWithMostDamage())
 		if(GetBestPlayerName() != "-still nobody-")
 			subtext = "\n           CHAMPION: " + GetBestPlayerName() + " / " + GetBestPlayerScore() + " kills. / " + GetDamageOfPlayerWithMostDamage() + " damage."
 		else subtext = ""
-			Message(player, file.selectedLocation.name, subtext, 25, "diag_ap_aiNotify_circleTimerStartNext_02")
+			Message(player, file.selectedLocation.name, subtext, 25, "")
+			SurvivalCommentary_PlaySoundForAllPlayers( "diag_ap_aiNotify_circleTimerStartNext_02" )
 		file.previousChampion=GetBestPlayer()
 		file.previousChallenger=PlayerWithMostDamage()
 		GameRules_SetTeamScore(player.GetTeam(), 0)
@@ -1737,7 +1753,8 @@ else{
 		if(GetBestPlayerName() != "-still nobody-")
 			subtext = "\n           CHAMPION: " + GetBestPlayerName() + " / " + GetBestPlayerScore() + " kills. \n    CHALLENGER:  " + PlayerWithMostDamageName() + " / " + GetDamageOfPlayerWithMostDamage() + " damage."
 		else subtext = ""
-			Message(player, file.selectedLocation.name, subtext, 25, "diag_ap_aiNotify_circleTimerStartNext_02")
+			Message(player, file.selectedLocation.name, subtext, 25, "")
+			SurvivalCommentary_PlaySoundForAllPlayers( "diag_ap_aiNotify_circleTimerStartNext_02" )
 		file.previousChampion=GetBestPlayer()
 		file.previousChallenger=PlayerWithMostDamage()
 		GameRules_SetTeamScore(player.GetTeam(), 0)
@@ -1791,77 +1808,85 @@ if(GetCurrentPlaylistVarBool("flowstateEndlessFFAorTDM", false ))
 	thread AutoChangeLevelThread(endTime)
 
 if (FlowState_Timer()){
+SetGlobalNetInt( "currentDeathFieldStage", 0 )
+SetGlobalNetTime( "nextCircleStartTime", endTime )
 while( Time() <= endTime )
 	{
 		if(Time() == endTime-900)
 		{
-				foreach(player in GetPlayerArray())
+				/* foreach(player in GetPlayerArray())
 				{
 					if(IsValid(player))
 					{
 						Message(player,"15 MINUTES REMAINING!","", 5)
 					}
-				}
+				} */
 			}
 			if(Time() == endTime-600)
 			{
-				foreach(player in GetPlayerArray())
+				/* foreach(player in GetPlayerArray())
 				{
 					if(IsValid(player))
 					{
 						Message(player,"10 MINUTES REMAINING!","", 5)
 					}
-				}
+				} */
 			}
 			if(Time() == endTime-300)
 			{
-				foreach(player in GetPlayerArray())
+				/* foreach(player in GetPlayerArray())
 				{
 					if(IsValid(player))
 					{
 						Message(player,"5 MINUTES REMAINING!","", 5)
 					}
-				}
+				} */
 			}
 			if(Time() == endTime-120)
 			{
-				foreach(player in GetPlayerArray())
+				/* foreach(player in GetPlayerArray())
 				{
 					if(IsValid(player))
 					{
 						Message(player,"2 MINUTES REMAINING!","", 5)
 					}
-				}
+				} */
 			}
 			if(Time() == endTime-60)
 			{
-				foreach(player in GetPlayerArray())
+				/* foreach(player in GetPlayerArray())
 				{
 					if(IsValid(player))
 					{
-						Message(player,"1 MINUTE REMAINING!","", 5, "diag_ap_aiNotify_circleMoves60sec")
+						Message(player,"1 MINUTE REMAINING!","", 5, "")
+						SurvivalCommentary_PlaySoundForAllPlayers( "diag_ap_aiNotify_circleMoves60sec_01" )
 					}
-				}
+				} */
+				SurvivalCommentary_PlaySoundForAllPlayers( "diag_ap_aiNotify_circleMoves60sec_01" )
 			}
 			if(Time() == endTime-30)
 			{
-				foreach(player in GetPlayerArray())
+				/* foreach(player in GetPlayerArray())
 				{
 					if(IsValid(player))
 					{
-						Message(player,"30 SECONDS REMAINING!","", 5, "diag_ap_aiNotify_circleMoves30sec")
+						Message(player,"30 SECONDS REMAINING!","", 5, "")
+						SurvivalCommentary_PlaySoundForAllPlayers( "diag_ap_aiNotify_circleMoves30sec_01" )
 					}
-				}
+				} */
+				SurvivalCommentary_PlaySoundForAllPlayers( "diag_ap_aiNotify_circleMoves30sec_01" )
 			}
 			if(Time() == endTime-10)
 			{
-				foreach(player in GetPlayerArray())
+				/* foreach(player in GetPlayerArray())
 				{
 					if(IsValid(player))
 					{
-						Message(player,"10 SECONDS REMAINING!", "\n The battle is over.", 8, "diag_ap_aiNotify_circleMoves10sec")
+						Message(player,"10 SECONDS REMAINING!", "\n The battle is over.", 8, "")
+						SurvivalCommentary_PlaySoundForAllPlayers( "diag_ap_aiNotify_circleMoves10sec_01" )
 					}
-				}
+				} */
+				SurvivalCommentary_PlaySoundForAllPlayers( "diag_ap_aiNotify_circleMoves10sec_01" )
 			}
 			if(file.tdmState == eTDMState.NEXT_ROUND_NOW){
 				printt("Flowstate DEBUG - tdmState is eTDMState.NEXT_ROUND_NOW Loop ended.")
@@ -1891,11 +1916,11 @@ foreach(player in GetPlayerArray())
 			{
 				PlayerRestoreShieldsFIESTA(player, player.GetShieldHealthMax())
 				PlayerRestoreHPFIESTA(player, 100)
-			} else 
+			} else
 				PlayerRestoreHP(player, 100, Equipment_GetDefaultShieldHP())
-				
+
 			player.SetThirdPersonShoulderModeOn()
-			HolsterAndDisableWeapons( player )	
+			HolsterAndDisableWeapons( player )
 		}
 		WaitFrame()
 	}
@@ -1946,7 +1971,7 @@ void function AutoChangeLevelThread(float endTime)
 			GameRules_ChangeMap(GetMapName(), GameRules_GetGameMode())
 		}
 	)
-	
+
 	while(Time() <= endTime)
 		WaitFrame()
 }
@@ -2299,9 +2324,9 @@ string function ScoreboardFinal(bool fromConsole = false)
 		p.damage = int(player.p.playerDamageDealt)
 		// p.lastLatency = int(player.GetLatency()* 1000)
 
-		if (fromConsole && player.IsObserver() && IsAlive(player)) 
+		if (fromConsole && player.IsObserver() && IsAlive(player))
 			spectators.append(p)
-		else 
+		else
 			playersInfo.append(p)
 	}
 	playersInfo.sort(ComparePlayerInfo)
@@ -2478,9 +2503,9 @@ string function GetOwnerName()
 {
 	if(file.mAdmins.len() != 0)
 		return file.mAdmins[0]
-	else 
+	else
 		return ""
-	
+
 	unreachable
 }
 
@@ -2587,9 +2612,9 @@ bool function ClientCommand_SpectateSURF(entity player, array<string> args)
 {
     if ( GetGameState() == eGameState.MapVoting || GetGameState() == eGameState.WaitingForPlayers)
         return false
-	
+
 	if(!IsValid(player)) return false
-	
+
     array<entity> playersON = GetPlayerArray_Alive()
 	playersON.fastremovebyvalue( player )
 
@@ -2602,7 +2627,7 @@ bool function ClientCommand_SpectateSURF(entity player, array<string> args)
             printf("error: try again")
             return false
         }
-		
+
         if( IsValid(player) && player.GetPlayerNetInt( "spectatorTargetCount" ) > 0 )
         {
             player.SetPlayerNetInt( "spectatorTargetCount", 0 )
@@ -2677,14 +2702,14 @@ bool function ClientCommand_GiveWeapon(entity player, array<string> args)
 
 	if(args.len() < 2) return false
 
-    if(file.whitelistedWeapons.len() && file.whitelistedWeapons.find(args[1]) != -1) 
+    if(file.whitelistedWeapons.len() && file.whitelistedWeapons.find(args[1]) != -1)
 	{
 		Message(player, "WEAPON WHITELISTED")
 		return false
 	}
-	
+
 	if( file.whitelistedAbilities.len() && file.whitelistedAbilities.find(args[1]) != -1 )
-	{	
+	{
 		Message(player, "ABILITY WHITELISTED")
 		return false
 	}
@@ -2764,7 +2789,7 @@ bool function ClientCommand_NextRound(entity player, array<string> args)
 	    	if (args[1] == "now")
 	    	   file.tdmState = eTDMState.NEXT_ROUND_NOW
 	    }
-	} else 
+	} else
 		return false
 
 	return true
@@ -2816,7 +2841,7 @@ bool function ClientCommand_UnGod(entity player, array<string> args)
 bool function ClientCommand_Scoreboard(entity player, array<string> args)
 {
 	if(!IsValid(player)) return false
-	
+
 	float ping = player.GetLatency() * 1000 - 40
 
 	Message(player,
@@ -2834,9 +2859,9 @@ bool function ClientCommand_Scoreboard(entity player, array<string> args)
 bool function ClientCommand_ScoreboardPROPHUNT(entity player, array<string> args)
 {
 	if(!IsValid(player)) return false
-	
+
 	float ping = player.GetLatency() * 1000 - 40
-	
+
 	Message(player,
 	"- PROPHUNT SCOREBOARD - ",
 	"Name:    K  |   D   \n" +
@@ -2878,7 +2903,7 @@ bool function ClientCommand_RebalanceTeams(entity player, array<string> args)
             Message(p, "TEAMS REBALANCED", "We have now " + numTeams + " teams.", 4)
         }
 		return true
-	} else 
+	} else
 		return false
 	unreachable
 }

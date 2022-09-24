@@ -32,7 +32,14 @@ var function OnWeaponTossReleaseAnimEvent_weapon_jump_pad( entity weapon, Weapon
 		PlayerUsedOffhand( player, weapon, true, deployable )
 		
 		#if SERVER
-		PlayBattleChatterLineToSpeakerAndTeam( player, "bc_super" )
+		if( !IsValid( player ) || !player.IsPlayer() )
+			return
+		
+		ItemFlavor character = LoadoutSlot_GetItemFlavor( ToEHI( player ), Loadout_CharacterClass() )
+		string charRef = ItemFlavor_GetHumanReadableRef( character )
+
+		if( charRef == "character_octane")
+			PlayBattleChatterLineToSpeakerAndTeam( player, "bc_super" )
 		#endif
 	}
 

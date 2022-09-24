@@ -84,8 +84,14 @@ void function DroneFireEMP( entity weapon )
 		weapon.SetWeaponPrimaryClipCount( weapon.GetWeaponPrimaryClipCountMax() )
 		return
 	}
+	if( !IsValid( owner ) || !owner.IsPlayer() )
+		return
+	
+	ItemFlavor character = LoadoutSlot_GetItemFlavor( ToEHI( owner ), Loadout_CharacterClass() )
+	string charRef = ItemFlavor_GetHumanReadableRef( character )
 
-	PlayBattleChatterLineToSpeakerAndTeam( owner, "bc_super" )
+	if( charRef == "character_crypto")
+		PlayBattleChatterLineToSpeakerAndTeam( owner, "bc_super" )
 
 	camera.Anim_Play( "drone_EMP" )
 
@@ -192,8 +198,8 @@ void function DroneFireEMP_Thread( entity weapon, entity camera, array<entity> t
 		if (target.GetScriptName() == "jump_pad")
 			target.Signal("OnDestroy")
 
-		if (!(target.GetScriptName() == "gas_trap" || target.GetScriptName() == "deployable_medic" || target.GetScriptName() == "domeOfProtection"))
-			target.Destroy()
+		if (target.GetScriptName() == "pylon" || target.GetScriptName() == "fence_node")
+			target.TakeDamage( target.GetMaxHealth() + 1, owner, weapon, { damageSourceId=eDamageSourceId.mp_ability_crypto_drone_emp } )
 	}
 
 	camera.Anim_Play( "drone_active_twitch" )

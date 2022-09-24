@@ -2,7 +2,7 @@ global function Canyonlands_MapInit_Common
 global function CodeCallback_PlayerEnterUpdraftTrigger
 global function CodeCallback_PlayerLeaveUpdraftTrigger
 
-#if SERVER && R5DEV
+#if SERVER && DEVELOPER
 	global function HoverTankTestPositions
 
 #endif
@@ -78,15 +78,17 @@ struct
 
 void function Canyonlands_MapInit_Common()
 {
-	if(GameRules_GetGameMode() == "custom_aimtrainer")
+	if(GameRules_GetGameMode() == "custom_aimtrainer" || GameRules_GetGameMode() == "map_editor")
 	return
-	
+
 	#if SERVER
+	RegisterSignal( "NessyDamaged" )
+	PrecacheModel( NESSY_MODEL )
 	AddCallback_EntitiesDidLoad( EntitiesDidLoad )
 	#endif
-	
+
 	if(GameRules_GetGameMode() == "custom_tdm" )
-	return
+		return
 
 	printt( "Canyonlands_MapInit_Common" )
 
@@ -121,17 +123,15 @@ void function Canyonlands_MapInit_Common()
 
 	#if SERVER
         InitWaterLeviathans()
-		LootTicks_Init()
 
 		FlagSet( "DisableDropships" )
 
 		svGlobal.evacEnabled = false //Need to disable this on a map level if it doesn't support it at all
 
-		RegisterSignal( "NessyDamaged" )
+		
 		RegisterSignal( SIGNAL_HOVERTANK_AT_ENDPOINT )
 		RegisterSignal( "PathFinished" )
 
-		PrecacheModel( NESSY_MODEL )
 
 		//SURVIVAL_AddOverrideCircleLocation_Nitro( <24744, 24462, 3980>, 2048 )
 
@@ -145,8 +145,8 @@ void function Canyonlands_MapInit_Common()
 		SURVIVAL_SetMapCenter( <0, 0, 0> )
         SURVIVAL_SetMapDelta( 4900 )
 
-        AddSpawnCallbackEditorClass( "prop_dynamic", "script_survival_pvpcurrency_container", OnPvpCurrencyContainerSpawned )    
-        AddSpawnCallbackEditorClass( "prop_dynamic", "script_survival_upgrade_station", OnSurvivalUpgradeStationSpawned )  
+        AddSpawnCallbackEditorClass( "prop_dynamic", "script_survival_pvpcurrency_container", OnPvpCurrencyContainerSpawned )
+        AddSpawnCallbackEditorClass( "prop_dynamic", "script_survival_upgrade_station", OnSurvivalUpgradeStationSpawned )
 		if ( GetMapName() == "mp_rr_canyonlands_staging" )
 		{
 			// adjust skybox for staging area
@@ -191,7 +191,7 @@ void function Canyonlands_MapInit_Common()
 
 #if SERVER
 void function OnPvpCurrencyContainerSpawned(entity ent)
-{	
+{
     if( GameRules_GetGameMode() != FREELANCE )
 	{
         if(IsValid(ent))
@@ -216,11 +216,11 @@ void function InitWaterLeviathans()
 
 void function EntitiesDidLoad()
 {
-	if(GetMapName() != "mp_rr_canyonlands_staging" && GetCurrentPlaylistVarBool( "flowstateFlyersAndDronesEnabled", false )){
-		InitLootDrones() //flyers
-		InitLootRollers() //flyers
-		InitLootDronePaths() //flyers
-		SpawnLootDrones(GetCurrentPlaylistVarInt( "flowstateFlyersAndDronesToSpawn", 40 ))} //flyers
+	// if(GetMapName() != "mp_rr_canyonlands_staging" && GetCurrentPlaylistVarBool( "flowstateFlyersAndDronesEnabled", false )){
+		// InitLootDrones() //flyers
+		// InitLootRollers() //flyers
+		// InitLootDronePaths() //flyers
+		// SpawnLootDrones(GetCurrentPlaylistVarInt( "flowstateFlyersAndDronesToSpawn", 40 ))} //flyers
 	thread __EntitiesDidLoad()
 }
 
@@ -229,12 +229,12 @@ void function __EntitiesDidLoad()
 	if(GetMapName() != "mp_rr_canyonlands_staging"){
 	SpawnEditorProps()
 	}
-	
+
 	if( GameRules_GetGameMode() != FREELANCE || GameRules_GetGameMode() != "custom_tdm")
 	{
 		waitthread FindHoverTankEndNodes()
 		SpawnHoverTanks()
-		if ( GetCurrentPlaylistVarInt( "enable_nessies", 1 ) == 1 )
+		if ( GetCurrentPlaylistVarBool( "enable_nessies", false ) )
 			Nessies()
 	}
 }
@@ -323,7 +323,7 @@ void function SpawnHoverTanks()
 {
 	if( !GetCurrentPlaylistVarBool( "bad_hover_tank_enabled", false ) )
 		return
-		
+
 	// Spawn hover tanks at level load, even though they don't fly in yet, so they exist when loot is spawned.
 	if ( file.numHoverTanksIntro == 0 && file.numHoverTanksMid == 0 )
 		return
@@ -940,7 +940,7 @@ void function HoverTank_DebugFlightPaths_Thread()
 	printt( "++++--------------------------------------------------------------------------------------------------------------------------++++" )
 }
 
-#if SERVER && R5DEV
+#if SERVER && DEVELOPER
 void function HoverTankTestPositions()
 {
 	entity player = GetPlayerArray()[0]
@@ -1107,7 +1107,7 @@ void function OnLeviathanMarkerCreated( entity marker )
 {
 	string markerTargetName = marker.GetTargetName()
 	printt( "OnLeviathanMarkerCreated, targetName: " + markerTargetName  )
-	#if R5DEV
+	#if DEVELOPER
 		if ( IsValid( file.clientSideLeviathan1 ) && markerTargetName == CANYONLANDS_LEVIATHAN1_NAME )
 		{
 			printt( "Destroying clientSideLeviathan1 with markerName: " + markerTargetName  )
@@ -1424,7 +1424,7 @@ void function SpawnEditorProps()
     CreateEditorPropKCLobby( $"mdl/IMC_base/generator_IMC_01.rmdl", <-18952.5,1656.7,6223.5>, <0,180,0>, true, 8000, -1 )
 
     CreateEditorPropKCLobby( $"mdl/vehicle/goblin_dropship/goblin_dropship.rmdl", <-18604,2115.18,6223.43>, <0,0,0>, true, 8000, -1 )
-    
+
 	CreateEditorPropKCLobby( $"mdl/vehicles_r5/land/msc_forklift_imc_v2/veh_land_msc_forklift_imc_v2_static.rmdl", <-18668,2536.64,6223.23>, <0,180,0>, true, 8000, -1 )
     CreateEditorPropKCLobby( $"mdl/thunderdome/thunderdome_cage_ceiling_256x256_06.rmdl", <-19136,1472,6720>, <0,-90,0>, true, 8000, -1 )
     CreateEditorPropKCLobby( $"mdl/thunderdome/thunderdome_cage_ceiling_256x256_06.rmdl", <-19136,1728,6720>, <0,-90,0>, true, 8000, -1 )

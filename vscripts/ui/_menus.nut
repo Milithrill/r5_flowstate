@@ -148,9 +148,11 @@ global function OpenXboxPartyApp
 global function OpenXboxHelp
 #endif //DURANGO_PROG
 
-#if R5DEV
+#if DEVELOPER
 global function OpenDevMenu
-#endif // R5DEV
+#endif // DEVELOPER
+
+global function OpenModelMenu
 
 struct
 {
@@ -497,7 +499,7 @@ void function UICodeCallback_FullyConnected( string levelname )
 
 	InitXPData()
 
-	#if R5DEV
+	#if DEVELOPER
 		ShDevUtility_Init()
 	#endif
 
@@ -509,6 +511,7 @@ void function UICodeCallback_FullyConnected( string levelname )
 	ShGRX_LevelInit()
 	Entitlements_LevelInit()
 	CustomizeCommon_Init()
+	CustomizeModel_Init()
 	ShLoadouts_LevelInit_Begin()
 	ShCharacters_LevelInit()
 	ShPassives_Init()
@@ -550,7 +553,7 @@ void function UICodeCallback_FullyConnected( string levelname )
 	//ShWeaponXP_Init()
 	//ShFactionXP_Init()
 
-	#if R5DEV
+	#if DEVELOPER
 		UpdatePrecachedSPWeapons()
 	#endif
 
@@ -1155,6 +1158,9 @@ bool function TryDialogFlowPersistenceQuery( string persistenceVar )
 
 void function DialogFlow()
 {
+	if ( !IsPlayPanelCurrentlyTopLevel() )
+		return
+
 	bool persistenceAvailable   = IsPersistenceAvailable()
 	string earliestRankedPeriod = Ranked_EarliestRankedPeriodWithRewardsNotAcknowledged()
 
@@ -1607,6 +1613,13 @@ void function InitMenus()
 	AddPanel( quipsPanel, "QuipsPanel", InitQuipsPanel )
 
 	AddPanel( customizeCharacterMenu, "CharacterExecutionsPanel", InitCharacterExecutionsPanel )
+
+	var customizeModelMenu = AddMenu( "CustomizeModelMenu", $"resource/ui/menus/customize_weapon.menu", InitCustomizeModelMenu )
+	AddPanel( customizeModelMenu, "WeaponSkinsPanel0", InitModelsPanel )
+	AddPanel( customizeModelMenu, "WeaponSkinsPanel1", InitModelsPanel )
+	AddPanel( customizeModelMenu, "WeaponSkinsPanel2", InitModelsPanel )
+	AddPanel( customizeModelMenu, "WeaponSkinsPanel3", InitModelsPanel )
+	AddPanel( customizeModelMenu, "WeaponSkinsPanel4", InitModelsPanel )
 
 	var customizeWeaponMenu = AddMenu( "CustomizeWeaponMenu", $"resource/ui/menus/customize_weapon.menu", InitCustomizeWeaponMenu )
 	AddPanel( customizeWeaponMenu, "WeaponSkinsPanel0", InitWeaponSkinsPanel )
@@ -2523,12 +2536,19 @@ void function OpenXboxHelp( var button )
 }
 #endif // DURANGO_PROG
 
-#if R5DEV
+#if DEVELOPER
 void function OpenDevMenu( var button )
 {
 	AdvanceMenu( GetMenu( "DevMenu" ) )
 }
-#endif //R5DEV
+#endif // DEVELOPER
+
+void function OpenModelMenu (string equipped) {
+	
+	SetTopLevelCustomizeContext(GetAllWeaponCategories()[0])
+	CustomizeModelMenus_Equip(equipped)
+	AdvanceMenu( GetMenu( "CustomizeModelMenu" ) )
+}
 
 void function SetDialog( var menu, bool val )
 {

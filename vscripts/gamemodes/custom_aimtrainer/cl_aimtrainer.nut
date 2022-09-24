@@ -109,7 +109,7 @@ void function Cl_ChallengesByColombia_Init()
 	SetConVarBool( "cl_showgpustats", false )
 	SetConVarBool( "cl_showsimstats", false )
 	SetConVarBool( "cl_showhoststats", false )
-	//SetConVarBool( "con_drawnotify", false )
+	SetConVarBool( "con_drawnotify", false )
 	SetConVarBool( "enable_debug_overlays", false )
 	SetConVarInt( "sq_showvmoutput", 3 )
 	SetConVarInt( "sq_showvmwarning", 2 )
@@ -119,10 +119,7 @@ void function Cl_ChallengesByColombia_Init()
 	
 	//laser sight particle
 	PrecacheParticleSystem($"P_wpn_lasercannon_aim_short_blue") 
-	
-	//for custom ui/textures
-	PakHandle AimTrainerRpak = RequestPakFile( "aimtrainer" )
-	
+
 	AddCallback_EntitiesDidLoad( AimTrainer_OnEntitiesDidLoad )
 }
 

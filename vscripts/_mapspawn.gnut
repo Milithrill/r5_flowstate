@@ -171,6 +171,17 @@ global struct SvGlobals
 
 global SvGlobals svGlobal
 
+struct{
+	//!FIXME ADD POINTS TO KC
+	vector auto_tp = <5486, 9155, -627>
+
+    table<entity, int> cp_table = {}
+
+	int current_cp = 0
+	array<vector> cps_pos = [<6893, 1086, -1385>, <4839, 1146, -1193>, <3389, 1982, -937>, <3389, 3681, -617>, <3394, 6570, -1257>, <4606, 9088, -745>, <5881, 8712, 4822>]
+	array<vector> cps_ang = [<-89,-178,-0>, <-0,-178,-0>, <-0, 89, -0>, <3, 51, -0>, <0, 90, -0>, <3, -0, -0>, <21, -46, -0>]	
+}file
+
 void function CodeCallback_MapSpawn() // original script entry point
 {
 	ShWeapons_LevelInit()
@@ -178,6 +189,7 @@ void function CodeCallback_MapSpawn() // original script entry point
 	//ScriptCompilerTest()
 	LoadDiamond()
 	MapTriggers_Init()
+	LootTicks_Init()
 
 	RegisterSignal( "CleanupFXAndSoundsForDecoy" )
 	RegisterSignal( "MirageSpotted" )
@@ -269,13 +281,6 @@ void function CodeCallback_MapSpawn() // original script entry point
 	PrecacheWeapon( $"mp_weapon_g2" )
 	PrecacheWeapon( $"mp_weapon_grenade_bangalore" )
 	PrecacheWeapon( $"mp_weapon_car" )
-		
-	if(GameRules_GetGameMode() != "custom_tdm") //This will cause issues for players joining FLOWSTATE SERVERS guaranteed, so I disable it for now. TEMP TEMP, enable when next sdk releases
-	{
-		PrecacheWeapon( $"mp_weapon_dragon_lmg" )
-		PrecacheWeapon( $"mp_weapon_3030" )
-	}
-	
 	PrecacheWeapon( $"mp_weapon_incap_shield" )
 	PrecacheWeapon( $"mp_ability_care_package" )
 	PrecacheWeapon( $"mp_ability_hunt_mode" )
@@ -300,17 +305,38 @@ void function CodeCallback_MapSpawn() // original script entry point
 	PrecacheWeapon( $"npc_weapon_energy_shotgun" )
 	PrecacheWeapon( $"npc_weapon_hemlok" )
 	PrecacheWeapon( $"npc_weapon_lstar" )
-	
-	if(GetCurrentPlaylistVarBool( "firingrange_aimtrainerbycolombia", false ))
-	{
-		PrecacheWeapon( $"mp_weapon_clickweapon")
-		PrecacheWeapon( $"mp_weapon_clickweaponauto")
-	}
 
+	switch(GameRules_GetGameMode())
+	{
+		case "custom_tdm":
+			break
+		case "custom_aimtrainer":
+			PrecacheWeapon( $"mp_weapon_clickweapon")
+			PrecacheWeapon( $"mp_weapon_clickweaponauto")
+			PrecacheWeapon( $"mp_weapon_3030" )
+			break
+		case "map_editor":
+			PrecacheWeapon( $"mp_weapon_editor" )
+			if ( GetCurrentPlaylistVarBool( "movement_map_enable", false ) )
+				_CheckPoints_Init()
+		default:
+			LoadModelsFromEditor()
+			if ( GetCurrentPlaylistVarBool( "movement_map_enable", false ) )
+				LoadMovementMap()
+			
+			//PrecacheWeapon( $"mp_weapon_grenade_gravity" )			
+			break
+	}
+	
+	PrecacheWeapon( $"mp_ability_cloak" )
+	PrecacheWeapon( $"mp_weapon_dragon_lmg" )
+	PrecacheWeapon( $"mp_weapon_3030" )
+	PrecacheWeapon( $"mp_ability_phase_rewind" )
+	PrecacheWeapon( $"mp_ability_space_elevator_tac" ) //needs more testing
+	
 	printl( "Code Script: _mapspawn" )
 	SV_CL_Shared_Init()
 	ClientCommands_Init()
-
 }
 
 var function CodeCallback_ClientCommand( entity player, array<string> args )
@@ -462,4 +488,84 @@ void function WallTriggerLeave( entity trigger , entity ent )
 			StatusEffect_StopAllOfType( ent, eStatusEffect.move_slow)
 		}
 	}
+}
+
+void function _CheckPoints_Init()
+{
+	AddClientCommandCallback( "cpTeleport", ClientCommand_TeleportToCurrentCp )
+	AddClientCommandCallback( "cpAdd", ClientCommand_AddOneToCpCount )
+	AddClientCommandCallback( "cpSub", ClientCommand_SubtractOneToCpCount)
+
+    AddCallback_OnClientConnected( Player_Init )
+}
+
+void function Player_Init( entity player ) {
+
+	thread function() : ( player )
+	{
+		while( !IsValid( player ) )
+			WaitFrame()
+		
+		wait 0.5 //!FIXME
+		if(!IsValid(player)) return
+		file.cp_table[player] <- 0
+		DecideRespawnPlayer(player, true)
+		player.UnfreezeControlsOnServer()
+		thread AutoTeleport(player)
+	}()
+}
+
+void function AutoTeleport(entity player) {
+	wait 0.5
+	if(!IsValid(player)) return
+	
+    player.SetOrigin(file.cps_pos[0])
+    player.SetAngles(file.cps_ang[0])
+}
+
+bool function ClientCommand_TeleportToCurrentCp(entity player, array<string> args)
+{
+
+	if( !IsValid( player ) )
+		return true
+	
+    player.SetOrigin(file.cps_pos[file.cp_table[player]])
+	player.SetAngles(file.cps_ang[file.cp_table[player]])
+			
+    return true
+}
+
+bool function ClientCommand_AddOneToCpCount(entity player, array<string> args)
+{
+	if( !IsValid( player ) )
+		return true
+	
+	file.cp_table[player] = (file.cp_table[player] + 1) % 7
+
+	// player.SetOrigin(file.cps_pos[file.current_cp])
+	// player.SetAngles(file.cps_ang[file.current_cp])
+
+    player.SetOrigin(file.cps_pos[file.cp_table[player]])
+	player.SetAngles(file.cps_ang[file.cp_table[player]])
+
+	return true
+}
+
+bool function ClientCommand_SubtractOneToCpCount(entity player, array<string> args)
+{
+	if( !IsValid( player ) )
+		return true
+	
+	// if (file.current_cp > 0) {
+	// 	file.current_cp = file.current_cp - 1
+	// } else {
+	// 	file.current_cp = 6
+	// }
+
+    file.cp_table[player] = (file.cp_table[player] + 6) % 7
+
+	player.SetOrigin(file.cps_pos[file.cp_table[player]])
+	player.SetAngles(file.cps_ang[file.cp_table[player]])
+
+	return true
 }
