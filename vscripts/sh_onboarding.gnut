@@ -143,9 +143,25 @@ void function Sequence_WaitingForPlayers()
 	bool introCountdownEnabled = CharSelect_GetIntroCountdownDuration() > 0.0
 
 	wait PreGame_GetWaitingForPlayersCountdown() + (introCountdownEnabled ? 0.0 : CharSelect_GetIntroMusicStartTime())
-	
+		
+	if(GameRules_GetGameMode() == "custom_tdm")
+	{	
+		SetGameState( eGameState.Playing )
+		return	
+	}
+
+	// Set champion randomly from among all players
 	if ( GetCurrentPlaylistVarBool( "survival_commentary_champion_enabled", true ) )
-		SetChampion( GetPlayerArray().getrandom() )
+	{
+		entity champion = GetPlayerArray().getrandom()
+		SetGlobalNetInt( "championEEH", champion.GetEncodedEHandle() )
+		array<entity> championSquadMates = GetPlayerArrayOfTeam( champion.GetTeam() )
+		championSquadMates.fastremovebyvalue( champion )
+		if( championSquadMates.len() >= 1 )
+			SetGlobalNetInt( "championSquad1EEH", championSquadMates[0].GetEncodedEHandle() )
+		if( championSquadMates.len() >= 2 )
+			SetGlobalNetInt( "championSquad2EEH", championSquadMates[1].GetEncodedEHandle() )
+	}
 
 	if ( !introCountdownEnabled )
 		PlayPickLoadoutMusic( false )
@@ -522,9 +538,6 @@ void function OnPlayerKilled( entity victim, entity attacker, var damageInfo )
 		return
 
 	UpdatePlayerCounts()
-	
-	if( victim == attacker )
-		return
 		
 	if ( attacker.IsPlayer() && victim.IsPlayer() && attacker != victim )
 		attacker.SetPlayerNetInt( "kills", attacker.GetPlayerNetInt( "kills" ) + 1 )

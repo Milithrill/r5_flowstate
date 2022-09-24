@@ -53,7 +53,6 @@ struct {
 	bool mapIndexChanged = true
 	array<entity> playerSpawnedProps
 	array<ItemFlavor> characters
-	float lastKillTimer
 	int SameKillerStoredKills=0
 	array<string> whitelistedWeapons
 	array<string> whitelistedAbilities
@@ -101,7 +100,7 @@ struct PlayerInfo
 
 void function _CustomTDM_Init()
 {
-	
+	RegisterSignal("NewKillOnPlayerStreak")
 	if(GetCurrentPlaylistVarBool("enable_global_chat", true))
 		SetConVarBool("sv_forceChatToTeamOnly", false) //thanks rexx
 	else	
@@ -464,40 +463,22 @@ void function __HighPingCheck(entity player)
 	}
 }
 
-
-void function doubletriplekillaudio(entity victim, entity attacker)
+void function DoubleAndTripleKillAudio(entity attacker)
 {
-	if (!IsValid(attacker))
+	if (!IsValid(attacker) || !attacker.p.isDownedEnemyRecently || attacker != GetKillLeader())
 		return
-
-    entity killeader = GetKillLeader()
-    float doubleKillTime = 5.0
-    float tripleKillTime = 8.0
-
-    bool ReqCheck = attacker == killeader
-    if (ReqCheck) {
-        if (!plsTripleAudio)
-            attacker.p.downedEnemyAtOneTime = 2
-        else if (plsTripleAudio)
-            attacker.p.downedEnemyAtOneTime = 3
-    }
-
-    if ((Time() - attacker.p.lastKillTimer) < doubleKillTime && ReqCheck && attacker.p.downedEnemyAtOneTime == 2) {
-        foreach(player in GetPlayerArray())
-        thread EmitSoundOnEntityOnlyToPlayer(player, player, "diag_ap_aiNotify_killLeaderDoubleKill")
-
-        if (FlowState_ChosenCharacter() == 8)
-            thread EmitSoundOnEntityOnlyToPlayer(attacker, attacker, "diag_mp_wraith_bc_iDownedMultiple_1p")
-        plsTripleAudio = true;
-    }
-
-    if ((Time() - attacker.p.lastKillTimer) < tripleKillTime && ReqCheck && attacker.p.downedEnemyAtOneTime == 3) {
-        attacker.p.downedEnemyAtOneTime = 0
-        wait 1
-        foreach(player in GetPlayerArray())
-        thread EmitSoundOnEntityOnlyToPlayer(player, player, "diag_ap_aiNotify_killLeaderTripleKill")
-        plsTripleAudio = false;
-    }
+	
+	if( attacker.p.downedEnemyAtOneTime == 2 )
+	{
+		foreach(player in GetPlayerArray())
+			thread EmitSoundOnEntityOnlyToPlayer(player, player, "diag_ap_aiNotify_killLeaderDoubleKill")
+	}
+	
+	if( attacker.p.downedEnemyAtOneTime == 3)
+	{
+		foreach(player in GetPlayerArray())
+			thread EmitSoundOnEntityOnlyToPlayer(player, player, "diag_ap_aiNotify_killLeaderTripleKill")
+	}
 }
 
 void function _OnPlayerDied(entity victim, entity attacker, var damageInfo)
@@ -510,19 +491,20 @@ void function _OnPlayerDied(entity victim, entity attacker, var damageInfo)
         case eGameState.Playing:
             // Víctim
             void functionref() victimHandleFunc = void function() : (victim, attacker, damageInfo) {
-
-				if ( IsValid(victim) && victim == GetKillLeader() )
+	    		wait 1
+	    		if(!IsValid(victim)) return
+				
+				if ( victim == GetKillLeader() )
 				{
-					victim.FreezeControlsOnServer()
-					AddSurvivalCommentaryEvent( eSurvivalEventType.KILL_LEADER_ELIMINATED, attacker )
+					thread AddSurvivalCommentaryEvent( eSurvivalEventType.KILL_LEADER_ELIMINATED, attacker )
 
 					foreach ( player in GetPlayerArray() )
 						Remote_CallFunction_NonReplay( player, "ServerCallback_Survival_HighlightedPlayerKilled", victim, attacker, eSurvivalCommentaryPlayerType.KILLLEADER )
 				}
-	    		wait 1
-	    		if(!IsValid(victim)) return
 				
-	    		if(file.tdmState != eTDMState.NEXT_ROUND_NOW && IsValid(victim) && IsValid(attacker) && Spectator_GetReplayIsEnabled() && ShouldSetObserverTarget( attacker )){
+	    		if(file.tdmState != eTDMState.NEXT_ROUND_NOW && IsValid(victim) && IsValid(attacker) && Spectator_GetReplayIsEnabled() && ShouldSetObserverTarget( attacker ))
+				{
+					victim.FreezeControlsOnServer()	
 	    			victim.SetObserverTarget( attacker )
 	    			victim.SetSpecReplayDelay( 4 )
 	    			victim.StartObserverMode( OBS_MODE_IN_EYE )
@@ -579,17 +561,26 @@ void function _OnPlayerDied(entity victim, entity attacker, var damageInfo)
 
 	    			WpnAutoReloadOnKill(attacker)
 	    			GameRules_SetTeamScore(attacker.GetTeam(), GameRules_GetTeamScore(attacker.GetTeam()) + 1)
-	    			attacker.p.lastKillTimer = Time()
-					
+
 					int attackerKills = attacker.GetPlayerNetInt( "kills" )
-					if(	!IsValid(GetKillLeader()) && attackerKills == 2)
+				
+					if(	!IsValid( GetKillLeader() ) && attackerKills == 2)
 					{
-						thread SetKillLeader( attacker, attackerKills )
+						thread SetKillLeader( attacker, attackerKills, true )
 						return
 					}
 					
-					if ( IsValid(GetKillLeader()) && attackerKills > GetKillLeader().GetPlayerNetInt( "kills" ) && attacker != GetKillLeader())
-						thread SetKillLeader( attacker, attackerKills )
+					if ( IsValid( GetKillLeader() ) && attackerKills > GetKillLeader().GetPlayerNetInt( "kills" ) && attacker != GetKillLeader())
+					{				
+						thread SetKillLeader( attacker, attackerKills, true)
+					}
+					
+					if ( IsValid( GetKillLeader() ) && attacker == GetKillLeader() && attacker.p.downedEnemyAtOneTime < 3)
+					{
+						attacker.p.downedEnemyAtOneTime += 1						
+						Signal(attacker, "NewKillOnPlayerStreak")
+						thread RecentlyDownedEnemy(attacker, 5)
+					}
 	    		}
             }
 	    	thread victimHandleFunc()
@@ -602,11 +593,23 @@ void function _OnPlayerDied(entity victim, entity attacker, var damageInfo)
 
 	file.deathPlayersCounter++
 	if(file.deathPlayersCounter == 1 )
-		AddSurvivalCommentaryEvent( eSurvivalEventType.FIRST_BLOOD, attacker )
+		thread AddSurvivalCommentaryEvent( eSurvivalEventType.FIRST_BLOOD, attacker )
 
 	UpdatePlayerCounts()
 }
 
+void function RecentlyDownedEnemy( entity attacker, float time )
+{
+	EndSignal(attacker, "NewKillOnPlayerStreak")
+	attacker.p.isDownedEnemyRecently = true
+	DoubleAndTripleKillAudio(attacker)
+	
+	wait time
+	
+	if(!IsValid(attacker)) return 
+	attacker.p.isDownedEnemyRecently = false
+	attacker.p.downedEnemyAtOneTime = 0
+}
 
 void function _HandleRespawn(entity player, bool isDroppodSpawn = false)
 {
@@ -2552,8 +2555,9 @@ bool function ClientCommand_SpectateEnemies(entity player, array<string> args)
             return false
         }
 
-        if( IsValid(player) && player.GetPlayerNetInt( "spectatorTargetCount" ) > 0 )
+        if( IsValid(player) && player.GetPlayerNetInt( "spectatorTargetCount" ) > 0 && player.IsObserver())
         {
+			player.MakeVisible()
             player.SetPlayerNetInt( "spectatorTargetCount", 0 )
 	        player.SetSpecReplayDelay( 0 )
             player.StopObserverMode()
@@ -2562,12 +2566,14 @@ bool function ClientCommand_SpectateEnemies(entity player, array<string> args)
         }
         else if( IsValid(player) && player.GetPlayerNetInt( "spectatorTargetCount" ) == 0 && IsValid(specTarget))
         {
-			player.MakeInvisible()
-            player.SetPlayerNetInt( "spectatorTargetCount", enemiesArray.len() )
-	        player.SetSpecReplayDelay( Spectator_GetReplayDelay() )
-	        player.StartObserverMode( OBS_MODE_IN_EYE )
-	        player.SetObserverTarget( specTarget )
-            printf("Spectating!")
+			try{
+				player.MakeInvisible()
+				player.SetPlayerNetInt( "spectatorTargetCount", enemiesArray.len() )
+				player.SetSpecReplayDelay( 2 )
+				player.StartObserverMode( OBS_MODE_IN_EYE )
+				player.SetObserverTarget( specTarget )
+				printf("Spectating!")
+			} catch(e420){}
         }
     }
     else
